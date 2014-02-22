@@ -8,17 +8,32 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.HashMap;
+import java.util.ArrayList;
 
-public class Server {
+public class Server implements Runnable {
 	
 	private static HashMap<String, String> userdb;
+	private static ArrayList<ChatThread> onlineUsers;
 	private static final int BLOCK_TIME = 60;
 	
 	private static ServerSocket serverSocket;
-	private static Socket clientSocket;
+
 	private static PrintWriter out = null;
 	private static BufferedReader in;
+	private static Thread thread = null;
+	
+	public Server(int portNumber) {
+		try {
+			serverSocket = new ServerSocket(portNumber);
+			System.out.println("Server started on port " + portNumber + "...");
+			onlineUsers = new ArrayList<ChatThread>();
+			start();
+		} catch(IOException ioe) {
+			ioe.printStackTrace();
+		}
+	}
 	
 	public static void main(String args[]) {
 		if(args.length != 1) {
@@ -26,55 +41,69 @@ public class Server {
 			System.exit(1);
 		}
 		
-		readUsers();
-		
 		//args[0] = "4118";
 		int portNumber = Integer.parseInt(args[0]);
-		
-		try {
-			serverSocket = new ServerSocket(portNumber);	//Create server socket and bind to port
-			clientSocket = serverSocket.accept();			//Blocks until receives/accepts connection from a client. Returns socket object and bind to client's address and port
-			out = new PrintWriter(clientSocket.getOutputStream(), true);	//Open's Readers and Writers to client's io stream
-			//out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
-			in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));	
-			
-			System.out.println("Server started on port " + portNumber + "...");
-			
-			int tries = 0;
-			while(tries < 3) {
-				authenticate();
-				tries++;
+		Server s = new Server(portNumber);
+	}
+
+	@Override
+	public void run() {
+		while(thread != null) {
+			// TODO Auto-generated method stub
+			try {
+				System.out.println("Waiting for client to connect...");
+				//clientSocket = serverSocket.accept();			//Blocks until receives/accepts connection from a client. Returns socket object and bind to client's address and port
+				addChatThread(serverSocket.accept());
 				
-				if(tries == 3) {
-					//Block this user for 60 seconds BLOCK_TIME
-					out.println("You're going to be blocked for " + BLOCK_TIME + " seconds!");
-					//out.write("You're going to be blocked for " + BLOCK_TIME + " seconds!");
+				
+				//out = new PrintWriter(clientSocket.getOutputStream(), true);	//Open's Readers and Writers to client's io stream
+				//out = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
+				//in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));	
+				
+				readUsers();
+				int tries = 0;
+				while(tries < 3) {
+					if(authenticate())
+						break;
+					
+					tries++;
+					System.out.println(tries);
+					if(tries == 3) { //Block this user for 60 seconds BLOCK_TIME
+						out.println("You're going to be blocked for " + BLOCK_TIME + " seconds!");
+						//out.write("You're going to be blocked for " + BLOCK_TIME + " seconds!");
+					}
 				}
+				
+				//User authenticated, may participate in chat
+				String inputLine, outputLine;
+				outputLine = "server: Hello Client";
+				out.println(outputLine);
+				//out.write(outputLine);
+				
+				while((inputLine = in.readLine()) != null) {	//Waits for client to respond 
+					System.out.println("client: " + inputLine);
+					out.println("server: " + inputLine);
+					//out.write("server: " + inputLine);
+				}
+				
+				serverSocket.close();
+				//clientSocket.close();
+				out.close();
+				in.close();
+				
+			} catch (IOException ioe) {
+				//ioe.printStackTrace();
+				System.out.println("Server connection terminated");
 			}
-			
-			String inputLine, outputLine;
-			outputLine = "server: Hello Client";
-			out.println(outputLine);
-			//out.write(outputLine);
-			
-			while((inputLine = in.readLine()) != null) {	//Waits for client to respond 
-				System.out.println("client: " + inputLine);
-				out.println("server: " + inputLine);
-				//out.write("server: " + inputLine);
-			}
-			
-			serverSocket.close();
-			clientSocket.close();
-			out.close();
-			in.close();
-			
-		} catch (IOException ioe) {
-			ioe.printStackTrace();
 		}
-		
-		
 	}
 	
+	public void start() {
+		if(thread == null) {
+			thread = new Thread(this);
+			thread.start();
+		}
+	}
 	
 	public static void readUsers() {
 		userdb = new HashMap<String, String>();
@@ -129,4 +158,7 @@ public class Server {
 		return false;
 	}
 	
+	public static void addChatThread(Socket clt) {
+		onlineUsers.add(new ChatThread(clt));
+	}
 }

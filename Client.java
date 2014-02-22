@@ -25,10 +25,13 @@ public class Client {
 			String userInput, servMsg;
 			while( (servMsg = in.readLine()) != null) {
 				System.out.println(servMsg);
+				
 				while( (userInput = stdin.readLine()) != null) {
 					out.println(userInput);
 					System.out.println(in.readLine());	//readLine() Blocks until server echoes line back to client. 
 				}
+				
+
 			}
 			servSocket.close();
 			out.close();
