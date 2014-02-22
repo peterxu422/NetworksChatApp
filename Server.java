@@ -14,8 +14,9 @@ import java.util.ArrayList;
 
 public class Server {
 	
-	private static HashMap<String, String> userdb;
-	private static ArrayList<ChatThread> onlineUsers;
+	// Protected variables?
+	public static HashMap<String, String> userdb;
+	public static ArrayList<ChatThread> onlineUsers;
 	
 	private static ServerSocket serverSocket;
 
@@ -47,7 +48,7 @@ public class Server {
 		for(;;) {
 			try {
 				System.out.println("Waiting for client to connect...");
-				ChatThread ct = new ChatThread(serverSocket.accept(), userdb);
+				ChatThread ct = new ChatThread(serverSocket.accept());
 				onlineUsers.add(ct);
 				Thread t = new Thread(ct);
 				t.start();
@@ -57,8 +58,6 @@ public class Server {
 			}
 		}
 	}
-	
-	
 	
 	public static void readUsers() {
 		userdb = new HashMap<String, String>();

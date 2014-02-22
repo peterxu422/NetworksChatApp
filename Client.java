@@ -26,9 +26,10 @@ public class Client {
 			while( (servMsg = in.readLine()) != null) {
 				System.out.println(servMsg);
 				
-				while( (userInput = stdin.readLine()) != null) {
+				while( (userInput = stdin.readLine()) != null) { /* Reads user's input from stdin */
 					out.println(userInput);
-					System.out.println(in.readLine());	//readLine() Blocks until server echoes line back to client. 
+					System.out.println(in.readLine());	//readLine() Blocks until server echoes line back to client.
+					System.out.print("$ ");			//Command prompt
 				}
 			}
 			servSocket.close();
