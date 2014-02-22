@@ -28,6 +28,7 @@ public class Client {
 				
 				while( (userInput = stdin.readLine()) != null) { /* Reads user's input from stdin */
 					out.println(userInput);
+					out.flush();
 					System.out.println(in.readLine());	//readLine() Blocks until server echoes line back to client.
 					System.out.print("$ ");			//Command prompt
 				}
