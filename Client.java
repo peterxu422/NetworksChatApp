@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
@@ -17,26 +18,27 @@ public class Client {
 		int portNumber = Integer.parseInt(args[1]);
 		
 		try {
-			Socket servSocket = new Socket(hostName, portNumber);		//Create socket to the server
-			PrintWriter out = new PrintWriter(servSocket.getOutputStream(), true);	//Read and Write streams to the server socket
+			Socket servSocket = new Socket(hostName, portNumber);										//Create socket to the server
+			PrintWriter out = new PrintWriter(servSocket.getOutputStream(), true);						//Read and Write streams to the server socket
 			BufferedReader in = new BufferedReader(new InputStreamReader(servSocket.getInputStream())); //Server's response comes in through here
-			BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));	//User input through here
 			
-			String userInput, servMsg;
-			while( (servMsg = in.readLine()) != null) {
+			Sender sender = new Sender(out);
+			sender.setDaemon(true);
+			sender.start();
+			
+			String servMsg;
+			char[] buf = new char[1024];
+			int n;
+			
+			// Listens for messages from server
+			while( (n = in.read(buf)) != -1) {
+				servMsg = new String(buf, 0, n);
 				System.out.println(servMsg);
-				
-				while( (userInput = stdin.readLine()) != null) { /* Reads user's input from stdin */
-					out.println(userInput);
-					out.flush();
-					System.out.println(in.readLine());	//readLine() Blocks until server echoes line back to client.
-					System.out.print("$ ");			//Command prompt
-				}
 			}
 			servSocket.close();
 			out.close();
 			in.close();
-			stdin.close();
+
 		} catch(IOException ioe) {
 			System.out.println("Client failed to connect");
 			ioe.printStackTrace();
