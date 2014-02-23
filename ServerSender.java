@@ -2,17 +2,35 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 
 public class ServerSender extends Thread {
 	
 	private ArrayList<User> onlineUsers;
-	public static HashMap<String, String> userdb;
+	private HashMap<String, String> userdb;
+	private HashMap<String, Date> banlist;
+	private static final long BLOCK_TIME_MIL = ClientListener.BLOCK_TIME * 1000;
+	
+	private class Banned {
+		private InetAddress ip;
+		private Date startBan;
+		
+		private Banned(InetAddress ip, Date st) {
+			this.ip = ip;
+			this.startBan = st;
+		}
+		
+		private InetAddress getIP()			{return ip;}
+		private Date getStartBan()			{return startBan;}
+	}
 	
 	public ServerSender() {
 		onlineUsers = new ArrayList<User>();
 		userdb = new HashMap<String, String>();
+		banlist = new HashMap<String, Date>();
 		readUsers();
 	}
 	
@@ -22,8 +40,9 @@ public class ServerSender extends Thread {
 		}
 	}
 	
-	public ArrayList<User> getOnlineUsers() 		{return onlineUsers;}
+	public ArrayList<User> getOnlineUsers() 				{return onlineUsers;}
 	public HashMap<String,String> getUserDB()				{return userdb;}
+	public HashMap<String, Date> getBanList()				{return banlist;}
 	
 	public synchronized void addClient(User u) {
 		//run authenticate before adding	
@@ -35,8 +54,33 @@ public class ServerSender extends Thread {
 		onlineUsers.remove(u);
 	}
 	
-	public void broadcast() {
+	/**
+	 * Checks if user u at ip address ipa was banned.
+	 * @param u username
+	 * @param ipa IP Address from which s/he connected
+	 * @return true if banned, false otherwise.
+	 */
+	public synchronized boolean isBanned(String uname, InetAddress ipa) {
+		String key = uname + ipa.toString();
 		
+		if(banlist.containsKey(key)) {  /* Username at this ip was banned previously but not necessarily still banned */	
+			Date st = banlist.get(key);
+			Date now = new Date();
+			long diff = now.getTime() - st.getTime();
+			
+			System.err.println("key: "+key + ", diff:"+diff);
+			
+			if(diff < BLOCK_TIME_MIL)	/* Check if they exceeded their ban time */
+				return true;
+			
+			banlist.remove(key);		/* If they have, remove them from the list */
+		}
+		return false;
+	}
+	
+	public synchronized void addBannedClient(String uname, InetAddress ipa) {
+		System.out.println("inside addban:"+uname + ipa.toString());
+		banlist.put(uname + ipa.toString(), new Date());
 	}
 	
 	public void readUsers() {
@@ -59,28 +103,4 @@ public class ServerSender extends Thread {
 			ioe.printStackTrace();
 		}
 	}
-	
-	/**
-	 * 
-	 * @return true if valid user, false otherwise
-	 */
-	/*
-	private boolean authenticate(User u) {
-		
-		String uname, pw;
-		u.send("username: ");
-		uname = u.rcv();
-		u.send("password: ");
-		pw = u.rcv();
-
-		if(userdb.containsKey(uname) && userdb.get(uname).equals(pw)) {
-			u.send("Welcome back " + uname + "!\r\n");
-			u.setUname(uname);
-			return true;
-		}
-
-		u.send("Invalid login");
-		return false;
-	}
-	*/
 }

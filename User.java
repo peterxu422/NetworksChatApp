@@ -25,6 +25,11 @@ public class User {
 	public String getUname()			{return uname;}
 	public Date getStart()				{return start;}
 	
+	/**
+	 * 
+	 * @param usr Name of user
+	 * @return true if usr is in blocked list of the client
+	 */
 	public boolean isBlocked(String usr) {
 		return blocked.contains(usr);
 	}
@@ -56,6 +61,11 @@ public class User {
 		return false;
 	}
 	
+	/**
+	 * Add the listeners and senders for the client connections
+	 * @param listener ClientListner object run as a thread to listen for incoming messages for the client
+	 * @param sender ClientSender object run as a thread to send messages to the server for the client
+	 */
 	public void addListenerSender(ClientListener listener, ClientSender sender) {
 		this.listener = listener;
 		this.sender = sender;
@@ -78,6 +88,7 @@ public class User {
 		sender.send(msg);
 	}
 	
+	/*
 	public String rcv() {
 		return listener.getLine();
 	}
@@ -89,5 +100,5 @@ public class User {
 	public void addRcvQ(String msg) {
 		rcvQ.add(msg);
 	}
-	
+	*/
 }

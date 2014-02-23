@@ -15,9 +15,11 @@ public class ClientListener extends Thread {
 	private BufferedReader in;
 	private User client;
 	private char[] buf;
-	ArrayList<User> online;
+	private ArrayList<User> online;
+	private HashMap<String, Date> banlist;
 	
 	private String[] cmds = {"whoelse", "wholasthr", "message", "broadcast", "block", "unblock", "logout"};
+	public static final long BLOCK_TIME = 60;
 	
 	public ClientListener(ServerSender servSender, Socket clntSock, User client, BufferedReader in) {
 		this.client = client;
@@ -26,17 +28,26 @@ public class ClientListener extends Thread {
 		buf = new char[1024];
 		this.servSender = servSender;
 		online = servSender.getOnlineUsers();
+		banlist = servSender.getBanList();
 	}
 	
 	public void run() {
-		
-		try {
-			if(authenticate(client))
-				servSender.addClient(client);
-			
+		try {			
+			int tries;
+			for(tries = 0; tries < 3; tries++) {
+				if(authenticate(client, tries)) {
+					servSender.addClient(client);
+					break;
+				}
+			}
+	
 			int n;
 			while( (n = in.read(buf)) != -1) {
 				String line = new String(buf, 0, n-2);	/* Do not include \r\n at the end of the input */
+				
+				/* THIS MUST BE CHANGED 
+				 * TO N-1 ON LINUX SYSTEM */
+				
 				System.out.println("len:"+line.length() + ",|"+line+"|");
 				//System.out.println("CListner's run(): ");
 				String[] toks = line.split(" ");
@@ -48,7 +59,7 @@ public class ClientListener extends Thread {
 					}
 				}
 				
-				client.addRcvQ(new String(buf, 0, n));
+				//client.addRcvQ(new String(buf, 0, n));
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -114,6 +125,7 @@ public class ClientListener extends Thread {
 		}
 		else {
 			//Invalid command
+			client.send("Error: Invalid command");
 		}
 	}
 	
@@ -123,8 +135,12 @@ public class ClientListener extends Thread {
 			System.err.println("online size: " + online.size());
 			
 			for(User u : online) {
-				if(u != client)	
-					client.send(u.getUname());
+				if(u != client)	{
+					if(client.isBlocked(u.getUname()))
+						client.send(u.getUname() + " (blocked)");
+					else
+						client.send(u.getUname());
+				}
 			}
 		}
 	}
@@ -136,7 +152,10 @@ public class ClientListener extends Thread {
 		for(User u : online) {
 			since = now.getTime() - u.getStart().getTime();
 			if(since < 1000 * 60 * 60 && u != client) {
-				client.send(u.getUname());
+				if(client.isBlocked(u.getUname()))
+					client.send(u.getUname() + " (blocked)");
+				else
+					client.send(u.getUname());
 			}
 		}
 	}
@@ -182,6 +201,10 @@ public class ClientListener extends Thread {
 	
 	private synchronized void logout() throws IOException {
 		servSender.removeClient(client);
+		close();
+	}
+	
+	private synchronized void close() throws IOException {
 		clntSock.close();
 		in.close();
 	}
@@ -191,12 +214,18 @@ public class ClientListener extends Thread {
 	 * @return true if valid user, false otherwise
 	 * @throws IOException 
 	 */
-	private boolean authenticate(User u) throws IOException {
+	private boolean authenticate(User u, int tries) throws IOException {
 		HashMap<String,String> userdb = servSender.getUserDB();
 		
 		String uname, pw;
 		u.send("username: ");
 		uname = in.readLine();
+		
+		if(servSender.isBanned(uname, clntSock.getInetAddress())) {
+			client.send("Your username at this IP address was banned. Reconnect later.");
+			close();
+		}
+		
 		u.send("password: ");
 		pw = in.readLine();
 
@@ -205,8 +234,18 @@ public class ClientListener extends Thread {
 			u.setUname(uname);
 			return true;
 		}
-
+		
 		u.send("Invalid login");
+		System.out.println("tries: "+ tries);
+		if(tries == 2) {
+			System.out.println("inside tries3");
+			if(!servSender.isBanned(uname, clntSock.getInetAddress())) {
+				System.out.println("before addban:"+uname + clntSock.getInetAddress());
+				servSender.addBannedClient(uname, clntSock.getInetAddress());
+				client.send("Your username at this IP address will be banned for " + BLOCK_TIME + " seconds.");
+			}	
+			close();
+		}
 		return false;
 	}
 }
