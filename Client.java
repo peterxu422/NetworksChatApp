@@ -40,8 +40,8 @@ public class Client {
 			in.close();
 
 		} catch(IOException ioe) {
-			System.out.println("Client failed to connect");
-			ioe.printStackTrace();
+			System.out.println("Connection has been closed.");
+			//ioe.printStackTrace();
 		}
 		
 	}

@@ -18,12 +18,15 @@ public class User {
 		sendQ = new LinkedList<String>();
 		rcvQ = new LinkedList<String>();
 		start = new Date();
-		blocked = new ArrayList<String>();
 	}
 	
 	public Queue<String> getRcvQ() 		{return rcvQ;}
 	public String getUname()			{return uname;}
 	public Date getStart()				{return start;}
+	
+	public void setBlockedList(ArrayList<String> blocked) {
+		this.blocked = blocked;
+	}
 	
 	/**
 	 * 

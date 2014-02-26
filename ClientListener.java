@@ -7,8 +7,16 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Queue;
 
 public class ClientListener extends Thread {
+	
+	/* Constants */
+	private String[] cmds = {"whoelse", "wholasthr", "message", "broadcast", "block", "unblock", "logout"};
+	public static final long BLOCK_TIME = 60 * 1000; 		/* The following values are in milliseconds */
+	public static final long LAST_HOUR = 60 * 60 * 1000; 
+	public static final long TIME_OUT = 30; 
 	
 	private ServerSender servSender;
 	private Socket clntSock;
@@ -17,9 +25,8 @@ public class ClientListener extends Thread {
 	private char[] buf;
 	private ArrayList<User> online;
 	private HashMap<String, Date> banlist;
-	
-	private String[] cmds = {"whoelse", "wholasthr", "message", "broadcast", "block", "unblock", "logout"};
-	public static final long BLOCK_TIME = 60;
+	private HashMap<String, Queue<String>> offlineMsgs;
+	private Date idle;
 	
 	public ClientListener(ServerSender servSender, Socket clntSock, User client, BufferedReader in) {
 		this.client = client;
@@ -28,16 +35,29 @@ public class ClientListener extends Thread {
 		buf = new char[1024];
 		this.servSender = servSender;
 		online = servSender.getOnlineUsers();
+		offlineMsgs = servSender.getOfflineMsgs();
 		banlist = servSender.getBanList();
 	}
 	
 	public void run() {
 		try {			
+			
+			// Check for Consecutive failure attempts overall, not just in order.
 			int tries;
 			for(tries = 0; tries < 3; tries++) {
 				if(authenticate(client, tries)) {
 					servSender.addClient(client);
 					break;
+				}
+			}
+			
+			/* Send the client any pending offline messages */
+			Queue<String> offmsgs = offlineMsgs.get(client.getUname());
+			if(offmsgs != null && offmsgs.peek() != null) {
+				client.send("Messages sent while you were offline.\n");
+				String s;
+				while( (s = offlineMsgs.get(client.getUname()).poll()) != null) {
+					client.send(s + "\n");
 				}
 			}
 	
@@ -48,7 +68,7 @@ public class ClientListener extends Thread {
 				/* THIS MUST BE CHANGED 
 				 * TO N-1 ON LINUX SYSTEM */
 				
-				System.out.println("len:"+line.length() + ",|"+line+"|");
+				//System.out.println("len:"+line.length() + ",|"+line+"|");
 				//System.out.println("CListner's run(): ");
 				String[] toks = line.split(" ");
 				
@@ -58,8 +78,6 @@ public class ClientListener extends Thread {
 						break;
 					}
 				}
-				
-				//client.addRcvQ(new String(buf, 0, n));
 			}
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -82,7 +100,6 @@ public class ClientListener extends Thread {
 					}
 				}
 				
-				//client.addRcvQ(new String(buf, 0, n));
 				return line;
 			}
 		} catch (IOException e) {
@@ -108,7 +125,6 @@ public class ClientListener extends Thread {
 			broadcast(tok[1]);
 		}
 		else if(cmd.equals("message")) {
-			System.out.println("message exec'd");
 			tok = line.split(p, 3);
 			message(tok[1], tok[2]);
 		}
@@ -145,13 +161,14 @@ public class ClientListener extends Thread {
 		}
 	}
 	
+	//Activity within the last hour
 	private void wholasthr() throws IOException {
 		long since;
 		Date now = new Date();
 		
 		for(User u : online) {
 			since = now.getTime() - u.getStart().getTime();
-			if(since < 1000 * 60 * 60 && u != client) {
+			if(since < LAST_HOUR && u != client) {
 				if(client.isBlocked(u.getUname()))
 					client.send(u.getUname() + " (blocked)");
 				else
@@ -161,28 +178,47 @@ public class ClientListener extends Thread {
 	}
 	
 	private void broadcast(String msg) throws IOException {
-		for(User u : online) {
-			if(u != client)
-				u.peerMsg(client, msg);
-		}
+		for(User u : online)
+			u.peerMsg(client, msg);
 	}
 	
 	private void message(String usr, String msg) throws IOException {
+		if(usr.equals(client.getUname())) {
+			client.send("Error: You cannot send a message to yourself");
+			return;
+		}
 		
 		for(User u : online) {
 			if(u.getUname().equals(usr)) {
 				if(u.isBlocked(client.getUname())) {
 					client.send(usr + " has blocked you.");
-					break;
+					return;
 				}
 				
 				u.peerMsg(client, msg);
-				break;
+				return;
+			}
+		}
+		
+		synchronized(offlineMsgs) {
+			/* User was not online, so add the message to their offline Queue */
+			if(offlineMsgs.containsKey(usr))
+				offlineMsgs.get(usr).add(client.getUname() + ": " + msg);
+			else {
+				Queue<String> msgs = new LinkedList<String>();
+				msgs.add(client.getUname() + ": " + msg);
+				offlineMsgs.put(usr, msgs);
 			}
 		}
 	}
 	
 	private void block(String usr) throws IOException {
+		if(usr.equals(client.getUname())) {
+			client.send("Error: You cannot block yourself!");
+			return;
+		}
+			
+		
 		if(client.addBlock(usr)) {
 			client.send(usr + " has been blocked.");
 			return;
@@ -199,14 +235,19 @@ public class ClientListener extends Thread {
 		client.send(usr + " was never blocked.");
 	}
 	
-	private synchronized void logout() throws IOException {
+	private synchronized void logout() {
 		servSender.removeClient(client);
 		close();
 	}
 	
-	private synchronized void close() throws IOException {
-		clntSock.close();
-		in.close();
+	private synchronized void close() {
+		try {
+			clntSock.close();
+			in.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			System.err.println("Client connection has been closed.");
+		}
 	}
 		
 	/**
@@ -221,9 +262,22 @@ public class ClientListener extends Thread {
 		u.send("username: ");
 		uname = in.readLine();
 		
+		/* Check if the user is on the ban list
+		 * Terminates connection if so and closes sockets and writers/readers.
+		 */
 		if(servSender.isBanned(uname, clntSock.getInetAddress())) {
 			client.send("Your username at this IP address was banned. Reconnect later.");
 			close();
+		}
+		
+		/*
+		 * Check for duplicate user
+		 */
+		for(User usr : online) {
+			if(usr.getUname().equals(uname)) {
+				client.send(uname + " is already logged in. Disconnecting...");
+				close();
+			}
 		}
 		
 		u.send("password: ");
@@ -232,6 +286,7 @@ public class ClientListener extends Thread {
 		if(userdb.containsKey(uname) && userdb.get(uname).equals(pw)) {
 			u.send("Welcome back " + uname + "!\r\n");
 			u.setUname(uname);
+			client.setBlockedList(servSender.getBlocked(client.getUname()));
 			return true;
 		}
 		
@@ -242,7 +297,7 @@ public class ClientListener extends Thread {
 			if(!servSender.isBanned(uname, clntSock.getInetAddress())) {
 				System.out.println("before addban:"+uname + clntSock.getInetAddress());
 				servSender.addBannedClient(uname, clntSock.getInetAddress());
-				client.send("Your username at this IP address will be banned for " + BLOCK_TIME + " seconds.");
+				client.send("Your username at this IP address will be banned for " + BLOCK_TIME/1000 + " seconds.");
 			}	
 			close();
 		}

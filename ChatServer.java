@@ -67,7 +67,7 @@ public class ChatServer {
 			System.exit(1);
 		}
 		
-		args[0] = "4118";
+		//args[0] = "4118";
 		int portNumber = Integer.parseInt(args[0]);
 		ChatServer s = new ChatServer(portNumber); //Create Server socket
 	}

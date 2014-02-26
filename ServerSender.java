@@ -4,15 +4,16 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Queue;
 import java.util.Date;
 import java.util.HashMap;
 
 public class ServerSender extends Thread {
-	
 	private ArrayList<User> onlineUsers;
 	private HashMap<String, String> userdb;
+	private HashMap<String, ArrayList<String>> blockLists;
 	private HashMap<String, Date> banlist;
-	private static final long BLOCK_TIME_MIL = ClientListener.BLOCK_TIME * 1000;
+	private HashMap<String, Queue<String>> offlineMsgs;	/* key: Username, value: Message Queue */
 	
 	private class Banned {
 		private InetAddress ip;
@@ -29,8 +30,10 @@ public class ServerSender extends Thread {
 	
 	public ServerSender() {
 		onlineUsers = new ArrayList<User>();
+		offlineMsgs = new HashMap<String, Queue<String>>();
 		userdb = new HashMap<String, String>();
 		banlist = new HashMap<String, Date>();
+		blockLists = new HashMap<String, ArrayList<String>>();
 		readUsers();
 	}
 	
@@ -41,8 +44,13 @@ public class ServerSender extends Thread {
 	}
 	
 	public ArrayList<User> getOnlineUsers() 				{return onlineUsers;}
+	public HashMap<String, Queue<String>> getOfflineMsgs()	{return offlineMsgs;}
 	public HashMap<String,String> getUserDB()				{return userdb;}
 	public HashMap<String, Date> getBanList()				{return banlist;}
+	
+	public synchronized ArrayList<String> getBlocked(String usr) {
+		return blockLists.get(usr);
+	}					
 	
 	public synchronized void addClient(User u) {
 		//run authenticate before adding	
@@ -70,7 +78,7 @@ public class ServerSender extends Thread {
 			
 			System.err.println("key: "+key + ", diff:"+diff);
 			
-			if(diff < BLOCK_TIME_MIL)	/* Check if they exceeded their ban time */
+			if(diff < ClientListener.BLOCK_TIME)	/* Check if they exceeded their ban time */
 				return true;
 			
 			banlist.remove(key);		/* If they have, remove them from the list */
@@ -92,6 +100,7 @@ public class ServerSender extends Thread {
 			while( (cred = br.readLine()) != null) {
 				String up[] = cred.split(" ");
 				userdb.put(up[0], up[1]);
+				blockLists.put(up[0], new ArrayList<String>());
 			}
 			br.close();
 			
