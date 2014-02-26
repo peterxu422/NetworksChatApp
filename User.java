@@ -1,7 +1,5 @@
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedList;
-import java.util.Queue;
 
 public class User {
 	private String uname;
@@ -9,20 +7,21 @@ public class User {
 	private ClientSender sender;
 	private Date start;
 	private ArrayList<String> blocked;
-	
-	//Message Queues
-	private Queue<String> sendQ;	/* Messages that the client wants to send */
-	private Queue<String> rcvQ;		/* Messages that were intended for the client */
+	private Date active;
 	
 	public User() {
-		sendQ = new LinkedList<String>();
-		rcvQ = new LinkedList<String>();
 		start = new Date();
+		active = new Date();
 	}
 	
-	public Queue<String> getRcvQ() 		{return rcvQ;}
 	public String getUname()			{return uname;}
 	public Date getStart()				{return start;}
+	public Date getActive()				{return active;}
+	
+	/**
+	 * Resets the active variable to indicate that the user is still active.
+	 */
+	public void setActive()				{active = new Date();}
 	
 	public void setBlockedList(ArrayList<String> blocked) {
 		this.blocked = blocked;
@@ -90,18 +89,4 @@ public class User {
 	public void send(String msg) {
 		sender.send(msg);
 	}
-	
-	/*
-	public String rcv() {
-		return listener.getLine();
-	}
-	
-	public void addSendQ(String msg) {
-		sendQ.add(msg);
-	}
-	
-	public void addRcvQ(String msg) {
-		rcvQ.add(msg);
-	}
-	*/
 }

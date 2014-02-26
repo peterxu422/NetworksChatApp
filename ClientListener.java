@@ -14,10 +14,13 @@ public class ClientListener extends Thread {
 	
 	/* Constants */
 	private String[] cmds = {"whoelse", "wholasthr", "message", "broadcast", "block", "unblock", "logout"};
-	public static final long BLOCK_TIME = 60 * 1000; 		/* The following values are in milliseconds */
-	public static final long LAST_HOUR = 60 * 60 * 1000; 
-	public static final long TIME_OUT = 30; 
 	
+	/* The following values are in milliseconds */
+	public static final long BLOCK_TIME = 60 * 1000; 		/* 1 minute */		
+	public static final long LAST_HOUR = 60 * 60 * 1000; 	/* 1 hour */
+	public static final long TIME_OUT = 30 * 60 * 1000; 	/* 30 minutes */
+	
+	private ActivityChecker checker;
 	private ServerSender servSender;
 	private Socket clntSock;
 	private BufferedReader in;
@@ -26,7 +29,36 @@ public class ClientListener extends Thread {
 	private ArrayList<User> online;
 	private HashMap<String, Date> banlist;
 	private HashMap<String, Queue<String>> offlineMsgs;
-	private Date idle;
+	
+	private class ActivityChecker extends Thread {
+		private static final long SLEEP_TIME = 30000;
+		
+		private ActivityChecker() {
+		}
+		
+		public void run() {
+			while(true) {
+				Date now = new Date();
+				long t = now.getTime() - client.getActive().getTime();
+				
+				if(t >= TIME_OUT) {
+					client.send("You have been logged out due to inactivity.");
+					logout();
+					return;
+				}
+				
+				/* Have the Thread check every half minute whether the Client is inactive so
+				 * as not to waste CPU resources.
+				 */
+				try {
+					Thread.sleep(SLEEP_TIME);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
+	}
 	
 	public ClientListener(ServerSender servSender, Socket clntSock, User client, BufferedReader in) {
 		this.client = client;
@@ -37,6 +69,9 @@ public class ClientListener extends Thread {
 		online = servSender.getOnlineUsers();
 		offlineMsgs = servSender.getOfflineMsgs();
 		banlist = servSender.getBanList();
+		
+		checker = new ActivityChecker();
+		checker.start();
 	}
 	
 	public void run() {
@@ -70,6 +105,9 @@ public class ClientListener extends Thread {
 				
 				//System.out.println("len:"+line.length() + ",|"+line+"|");
 				//System.out.println("CListner's run(): ");
+				
+				/* If something was read from the buffer, then user is still active */
+				client.setActive();
 				String[] toks = line.split(" ");
 				
 				for(String c : cmds) {
@@ -86,6 +124,7 @@ public class ClientListener extends Thread {
 		}
 	}
 	
+	/*
 	public String getLine() {
 		int n;
 		try {
@@ -110,6 +149,7 @@ public class ClientListener extends Thread {
 		
 		return null;
 	}
+	*/
 	
 	private void exec(String cmd, String line) throws IOException {
 		String tok[];
@@ -122,19 +162,23 @@ public class ClientListener extends Thread {
 		}
 		else if(cmd.equals("broadcast")) {
 			tok = line.split(p, 2);
-			broadcast(tok[1]);
+			if(tok.length == 2)
+				broadcast(tok[1]);
 		}
 		else if(cmd.equals("message")) {
 			tok = line.split(p, 3);
-			message(tok[1], tok[2]);
+			if(tok.length == 3)
+				message(tok[1], tok[2]);
 		}
 		else if(cmd.equals("block")) {
 			tok = line.split(p, 2);
-			block(tok[1]);
+			if(tok.length == 2)
+				block(tok[1]);
 		}
 		else if(cmd.equals("unblock")) {
 			tok = line.split(p, 2);
-			unblock(tok[1]);
+			if(tok.length == 2)
+				unblock(tok[1]);
 		}
 		else if(cmd.equals("logout")) {
 			logout();
@@ -148,7 +192,7 @@ public class ClientListener extends Thread {
 	private void whoelse() throws IOException {
 		// May need to use synchronize here
 		synchronized(online) {
-			System.err.println("online size: " + online.size());
+			//System.err.println("online size: " + online.size());
 			
 			for(User u : online) {
 				if(u != client)	{

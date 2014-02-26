@@ -39,7 +39,6 @@ public class ServerSender extends Thread {
 	
 	public void run() {
 		while(true) {
-			
 		}
 	}
 	
@@ -71,7 +70,7 @@ public class ServerSender extends Thread {
 	public synchronized boolean isBanned(String uname, InetAddress ipa) {
 		String key = uname + ipa.toString();
 		
-		if(banlist.containsKey(key)) {  /* Username at this ip was banned previously but not necessarily still banned */	
+		if(banlist.containsKey(key)) {  			/* Username at this ip was banned previously but not necessarily still banned */	
 			Date st = banlist.get(key);
 			Date now = new Date();
 			long diff = now.getTime() - st.getTime();
@@ -81,7 +80,7 @@ public class ServerSender extends Thread {
 			if(diff < ClientListener.BLOCK_TIME)	/* Check if they exceeded their ban time */
 				return true;
 			
-			banlist.remove(key);		/* If they have, remove them from the list */
+			banlist.remove(key);					/* If they have, remove them from the list */
 		}
 		return false;
 	}
