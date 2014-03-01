@@ -86,6 +86,10 @@ public class User {
 		sender.send(from.getUname() + ": " + msg);
 	}
 	
+	/**
+	 * Send a response message to the client.
+	 * @param msg
+	 */
 	public void send(String msg) {
 		sender.send(msg);
 	}

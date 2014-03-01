@@ -10,23 +10,12 @@ import java.util.HashMap;
 
 public class ServerSender extends Thread {
 	private ArrayList<User> onlineUsers;
+	private HashMap<String, Date> recentLogouts;
 	private HashMap<String, String> userdb;
 	private HashMap<String, ArrayList<String>> blockLists;
 	private HashMap<String, Date> banlist;
 	private HashMap<String, Queue<String>> offlineMsgs;	/* key: Username, value: Message Queue */
-	
-	private class Banned {
-		private InetAddress ip;
-		private Date startBan;
-		
-		private Banned(InetAddress ip, Date st) {
-			this.ip = ip;
-			this.startBan = st;
-		}
-		
-		private InetAddress getIP()			{return ip;}
-		private Date getStartBan()			{return startBan;}
-	}
+	private HashMap<String, Integer> logonTries;
 	
 	public ServerSender() {
 		onlineUsers = new ArrayList<User>();
@@ -34,6 +23,8 @@ public class ServerSender extends Thread {
 		userdb = new HashMap<String, String>();
 		banlist = new HashMap<String, Date>();
 		blockLists = new HashMap<String, ArrayList<String>>();
+		recentLogouts = new HashMap<String, Date>();
+		logonTries = new HashMap<String, Integer>();
 		readUsers();
 	}
 	
@@ -43,22 +34,44 @@ public class ServerSender extends Thread {
 	}
 	
 	public ArrayList<User> getOnlineUsers() 				{return onlineUsers;}
+	public HashMap<String, Date> getRecentLogouts() 		{return recentLogouts;}
 	public HashMap<String, Queue<String>> getOfflineMsgs()	{return offlineMsgs;}
 	public HashMap<String,String> getUserDB()				{return userdb;}
 	public HashMap<String, Date> getBanList()				{return banlist;}
+	public HashMap<String, Integer> getLogonTries()			{return logonTries;}
 	
 	public synchronized ArrayList<String> getBlocked(String usr) {
 		return blockLists.get(usr);
 	}					
 	
 	public synchronized void addClient(User u) {
-		//run authenticate before adding	
 		System.out.println("addingClient: " + u.getUname());
 		onlineUsers.add(u);
 	}
 	
 	public synchronized void removeClient(User u) {
 		onlineUsers.remove(u);
+	}
+	
+	public synchronized void addLogout(String name) {
+		recentLogouts.put(name, new Date());
+	}
+	
+	public synchronized int getNumLogonTries(String usr) {
+		Integer tries;
+		if( (tries = logonTries.get(usr)) == null )
+			return -1;
+		
+		return tries.intValue();
+	}
+	
+	public synchronized void addTries(String usr) {
+		Integer tries = logonTries.get(usr);
+		logonTries.put(usr, new Integer(tries.intValue() + 1));
+	}
+	
+	public synchronized void resetTries(String usr) {
+		logonTries.put(usr, new Integer(0));
 	}
 	
 	/**
@@ -100,6 +113,7 @@ public class ServerSender extends Thread {
 				String up[] = cred.split(" ");
 				userdb.put(up[0], up[1]);
 				blockLists.put(up[0], new ArrayList<String>());
+				logonTries.put(up[0], new Integer(0));
 			}
 			br.close();
 			
