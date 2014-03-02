@@ -19,11 +19,7 @@ public class ClientSender extends Thread {
 	}
 	
 	public void run() {
-		
-		isInterrupted();
-		Queue<String> queue = client.getRcvQ();
-		while(queue.size() > 0) {
-			out.println(queue.poll());
+		while(true){
 		}
 	}
 }
