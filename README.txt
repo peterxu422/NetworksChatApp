@@ -23,10 +23,11 @@ Additional Comments:
 b. Wrote code on Eclipse in Windows and tested on CLIC Machine.
 
 c.
+Navigate to the px2117_java directory. Make sure 'user_pass.txt' is inside along with all the .java files.
 Type 'make' in the prompt.
 Run the ChatServer program 'java ChatServer <port number>'
 In another terminal run the Client Program 'java Client <ip address or host name> <port number>'
-Type Chat server commands.
+Type Chat server commands in the client terminal.
 
 d. The commands are invoked as specified in the Project description
 
