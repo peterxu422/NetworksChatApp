@@ -107,7 +107,7 @@ public class ClientListener extends Thread {
 				client.send("Messages sent while you were offline.\n");
 				String s;
 				while( (s = offlineMsgs.get(client.getUname()).poll()) != null) {
-					client.send(s + "\n");
+					client.send(s);
 				}
 			}
 			
@@ -115,7 +115,7 @@ public class ClientListener extends Thread {
 			int n;
 			while( (n = in.read(buf)) != -1) {
 				boolean iscmd = false;
-				String line = new String(buf, 0, n-2);	/* Do not include \r\n at the end of the input */
+				String line = new String(buf, 0, n-1);	/* Do not include \r\n at the end of the input */
 				
 				/* THIS MUST BE CHANGED 
 				 * TO N-1 ON LINUX SYSTEM */
@@ -223,9 +223,14 @@ public class ClientListener extends Thread {
 		Iterator it = logouts.keySet().iterator();
 		Date now = new Date();
 		
+		if(it.hasNext() && online.size() > 2)
+		    	client.send("\n");
+		else if(it.hasNext())
+			client.send("");
+
 		while(it.hasNext()) {
 			String name = (String) it.next();
-			if(name.equals(clntName))
+			if(name == null || name.equals(clntName))
 				continue;
 			
 			Date loggedOut = logouts.get(name);
@@ -233,9 +238,9 @@ public class ClientListener extends Thread {
 			
 			if(since < LAST_HOUR) {
 				if(client.isBlocked(name))
-					client.send(name + " (blocked) (offline)");
+					client.send(name + " (blocked) (offline)\n");
 				else
-					client.send(name + " (offline)");
+					client.send(name + " (offline)\n");
 			}
 			else {	/* Remove them if they were logged out more than an hour ago */
 				logouts.remove(name);
@@ -381,6 +386,7 @@ public class ClientListener extends Thread {
 			u.setUname(uname);
 			client.setBlockedList(servSender.getBlocked(client.getUname()));
 			servSender.resetTries(uname);
+			servSender.getRecentLogouts().remove(uname);
 			return true;
 		}
 		
@@ -391,6 +397,7 @@ public class ClientListener extends Thread {
 			if(!servSender.isBanned(uname, clntSock.getInetAddress())) {
 				System.out.println("before addban:"+uname + clntSock.getInetAddress());
 				servSender.addBannedClient(uname, clntSock.getInetAddress());
+				servSender.resetTries(uname);
 				client.send("Your username at this IP address will be banned for " + BLOCK_TIME/1000 + " seconds.");
 			}	
 			close();
